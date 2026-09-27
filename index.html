@@ -67,8 +67,8 @@ small{color:var(--t2);font-size:12px}
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // ---------- CONFIG: fill these in from your Supabase project ----------
-const SUPABASE_URL = "https://surgppobaxxhvcqkfozf.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_L-MMYLMJYYKybw4Xx6SVUQ_1Avippfs";
+const SUPABASE_URL = "YOUR_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
 // The Edge Function URL is derived from SUPABASE_URL automatically.
 // -----------------------------------------------------------------------
 
@@ -84,7 +84,7 @@ if(!SUPABASE_URL.startsWith('YOUR_') && !SUPABASE_ANON_KEY.startsWith('YOUR_')){
   $('#login').disabled = true;
 }
 
-const blankDraft=()=>({model:'',reg:'',note:'',ask:'',oth:150,sale:'',days:21,tgt:500,repairs:[],hammer:'',vatIndem:false});
+const blankDraft=()=>({model:'',reg:'',note:'',ask:'',oth:0,sale:'',tgt:500,repairs:[],hammer:'',vatIndem:false});
 let st = { short:[], cars:[], notes:{}, active:null, draft:blankDraft(), chk:{}, fuel:'Petrol', gear:'Manual' };
 let tab='check', selId=null, open={s0:true}, rmArm=0, slArm=0, saveTimer=null, lookupBusy=false, lookupMsg='';
 
@@ -106,7 +106,7 @@ const PAY=["Funds cleared in your account, not just a screenshot","Buyer's ID se
 const mk=(t,k)=>({k,w:t[0]==='!',t:t[0]==='!'?t.slice(1):t});
 function secs(){const r=S.map((s,i)=>({k:'s'+i,n:s[0],it:s[1].map((t,j)=>mk(t,'s'+i+'-'+j))}));r.push({k:'f'+st.fuel,n:st.fuel+' checks',it:F[st.fuel].map((t,j)=>mk(t,'f'+st.fuel+j))});if(st.fuel!=='Electric')r.push({k:'g'+st.gear,n:st.gear+' gearbox',it:G[st.gear].map((t,j)=>mk(t,'g'+st.gear+j))});return r}
 const ck=k=>st.chk[k]||(st.chk[k]={s:'',c:'',n:''});
-function calc(d){const ask=+d.ask||0,oth=+d.oth||0,sale=+d.sale||0,days=+d.days||0,tgt=+d.tgt||0;const rep=d.repairs.reduce((s,r)=>s+r.a,0),buf=rep*1.1,hold=days*4,net=sale*.95,cost=ask+buf+oth+hold,profit=net-cost;return{ask,sale,rep,profit,roi:cost?profit/cost*100:0,pd:days?profit/days:0,max:net-buf-oth-hold-tgt}}
+function calc(d){const ask=+d.ask||0,fees=+d.oth||0,sale=+d.sale||0,tgt=+d.tgt||0;const rep=d.repairs.reduce((s,r)=>s+r.a,0),buf=rep*1.1,net=sale*.95,cost=ask+buf+fees,profit=net-cost;return{ask,sale,rep,fees,otd:ask+fees,profit,roi:cost?profit/cost*100:0,max:net-buf-fees-tgt}}
 const daysHeld=c=>Math.max(1,Math.round(((c.soldTs||Date.now())-c.start)/864e5));
 const costOf=c=>c.bought+c.rep+c.other+daysHeld(c)*4;
 const curPrice=c=>c.soldPrice!=null?c.soldPrice:c.offers.length?c.offers[c.offers.length-1][1]:c.listed;
@@ -117,15 +117,15 @@ function vAuction(){const d=st.draft;return `<div class="card"><h2>Auction out-t
 <label>Hammer price (£)<input data-d="hammer" type="number" inputmode="decimal" value="${esc(d.hammer)}" placeholder="3500"></label>
 <label class="r" style="margin-top:8px;font-size:14px"><input type="checkbox" style="width:auto;margin:0" data-d="vatIndem" ${d.vatIndem?'checked':''}> Fees are also +VAT (check your invoice)</label>
 <div id="auc"></div>
-<button class="pri" data-a="useAuc" style="margin-top:10px">Use as asking price on Check tab</button>
-<small style="display:block;margin-top:8px">Wilsons Auctions indemnity charges, entered by you. Assumes 20% VAT on the hammer price; tick above if the indemnity fee also carries VAT on your invoice. Bands only go up to £30,999 — check with the auction house above that.</small></div>`}
+<button class="pri" data-a="useAuc" style="margin-top:10px">Use in Check tab</button>
+<small style="display:block;margin-top:8px">Fills in the Check tab's asking price with the hammer price plus its VAT, and Auction fees with the indemnity charge plus its VAT. Wilsons Auctions indemnity charges, entered by you. Bands only go up to £30,999 — check with the auction house above that.</small></div>`}
 function vCheck(){const d=st.draft;return slCard()+`<div class="card"><h2>Deal check</h2>
 <label>Reg plate<div class="r"><input class="plate" data-d="reg" value="${esc(d.reg)}" placeholder="AB16 CDE" autocapitalize="characters" style="flex:1"></div></label>
 <button class="sm" data-a="lookup" style="width:100%;margin-top:8px">${lookupBusy?'Looking up…':'Look up this reg (DVLA + MOT)'}</button>
 <p id="lookupmsg" style="font-size:13px;margin:6px 0 0">${esc(lookupMsg)}</p>
 <label style="margin:10px 0">Model<input data-d="model" value="${esc(d.model)}" placeholder="Ford Fiesta 1.0"></label>
 <label style="margin-bottom:10px">Listing link, seller, notes<textarea data-d="note" rows="2" placeholder="Link, seller's number, what they said">${esc(d.note||'')}</textarea></label>
-<div class="g2">${nf('ask','Asking or agreed price (£)')}${nf('oth','Other costs (£)')}${nf('sale','Expected sale (£)')}${nf('days','Days to sell')}${nf('tgt','Target profit (£)')}</div></div>
+<div class="g2">${nf('ask','Asking or agreed price (£)')}${nf('sale','Expected sale (£)')}${nf('oth','Auction fees (£)')}${nf('tgt','Target profit (£)')}</div><small>Auction fees fill in automatically when you use the Auction tab, or type your own.</small></div>
 <div class="card"><h2>Repairs <span id="reptot"></span></h2><div id="replist"></div><div class="r" style="margin-top:8px"><input id="rn" placeholder="Clutch"><input id="ra" type="number" inputmode="numeric" placeholder="£" style="width:90px"><button class="sm" data-a="addrep" aria-label="Add repair">+</button></div><small id="rerr" class="t-bad"></small></div>
 <div id="res"></div>
 <button class="pri" data-a="buy" style="margin-top:8px">Bought it: add to In stock</button><small id="berr" class="t-bad"></small>
@@ -139,7 +139,7 @@ e.innerHTML=mets([['Indemnity charge',f(idm)],['VAT on hammer (20%)',f(vatH)],['
 function updCheck(){if(!$('#res'))return;const d=st.draft,c=calc(d);
 $('#reptot').textContent=f(c.rep);
 $('#replist').innerHTML=d.repairs.length?d.repairs.map((r,i)=>`<div class="li"><span>${esc(r.n)}</span><span>${f(r.a)} <button class="sm" data-a="delrep" data-i="${i}" aria-label="Remove ${esc(r.n)}">×</button></span></div>`).join(''):'<small>No repairs yet. Add each job with its cost.</small>';
-$('#res').innerHTML=(!c.ask||!c.sale)?ban('wn','Enter the asking price and expected sale price to see the verdict.'):(c.ask<=c.max?ban('ok',`Asking price is ${f(c.max-c.ask)} under your max bid. Worth viewing.`):ban('bad',`Asking price is ${f(c.ask-c.max)} over your max bid. Offer ${f(c.max)} or walk away.`))+mets([['Profit',f(c.profit),c.profit>=0?'t-ok':'t-bad'],['ROI',c.roi.toFixed(1)+'%'],['Profit per day',f(c.pd)],['Max bid',f(c.max)]])+'<small>Assumes a 5% haggle off the sale price, a 10% repair buffer and £4 a day holding cost.</small>'}
+$('#res').innerHTML=(!c.ask||!c.sale)?ban('wn','Enter the asking price and expected sale price to see the verdict.'):(c.ask<=c.max?ban('ok',`Asking price is ${f(c.max-c.ask)} under your max bid. Worth viewing.`):ban('bad',`Asking price is ${f(c.ask-c.max)} over your max bid. Offer ${f(c.max)} or walk away.`))+mets([['Profit',f(c.profit),c.profit>=0?'t-ok':'t-bad'],['ROI',c.roi.toFixed(1)+'%'],['Auction fees',f(c.fees)],['Out the door',f(c.otd)],['Max bid',f(c.max)]])+'<small>Assumes a 5% haggle off the sale price and a 10% repair buffer.</small>'}
 function vView(){const d=st.draft,ns=st.notes[d.model||'_']||'';
 let h=`<div class="card"><h2>${esc(d.model||'No model set')} <small>${esc(d.reg)}</small></h2>
 ${st.short.length?`<label style="margin-bottom:10px">Switch car<select id="sw">${st.active?'':'<option value="0" selected>Unsaved deal</option>'}${st.short.map(x=>`<option value="${x.id}"${x.id===st.active?' selected':''}>${esc(x.draft.model||'Unnamed')} ${esc(x.draft.reg||'')}</option>`).join('')}</select></label>`:''}
@@ -179,7 +179,7 @@ async function loadAll(){
   const {data,error}=await sb.from('flip_cars').select('*').order('created_at',{ascending:true});
   if(error){ setPill('error'); return; }
   const rows=data||[];
-  st.short=rows.filter(r=>r.status==='shortlist').map(r=>({id:r.id,source:r.source,draft:{model:r.model,reg:r.reg,note:r.note||'',ask:r.ask==null?'':r.ask,oth:r.other,sale:r.sale==null?'':r.sale,days:r.days,tgt:r.target,repairs:r.repairs||[],hammer:r.hammer==null?'':r.hammer,vatIndem:!!r.vat_indem},chk:r.checklist||{},fuel:r.fuel||'Petrol',gear:r.gear||'Manual'}));
+  st.short=rows.filter(r=>r.status==='shortlist').map(r=>({id:r.id,source:r.source,draft:{model:r.model,reg:r.reg,note:r.note||'',ask:r.ask==null?'':r.ask,oth:r.other==null?0:r.other,sale:r.sale==null?'':r.sale,tgt:r.target,repairs:r.repairs||[],hammer:r.hammer==null?'':r.hammer,vatIndem:!!r.vat_indem},chk:r.checklist||{},fuel:r.fuel||'Petrol',gear:r.gear||'Manual'}));
   st.cars=rows.filter(r=>r.status!=='shortlist').map(r=>({id:r.id,model:r.model,reg:r.reg,bought:r.bought||0,repEst:r.rep_est||0,rep:r.rep||0,other:r.other||0,listed:r.listed||0,target:r.target||0,start:r.start?+new Date(r.start):Date.now(),offers:r.offers||[],soldPrice:r.sold_price,soldTs:r.sold_ts?+new Date(r.sold_ts):null,pay:r.pay||[false,false,false,false]}));
   const {data:nd}=await sb.from('model_notes').select('*');
   st.notes={}; (nd||[]).forEach(n=>{st.notes[n.model]=n.note});
@@ -192,7 +192,7 @@ async function flushDraftSave(){
   clearTimeout(saveTimer);
   const d=st.draft,hasContent=d.model.trim()||d.reg.trim()||d.ask||d.sale;
   if(!hasContent&&!st.active){setPill('idle');return}
-  const patch={status:'shortlist',model:d.model.trim(),reg:d.reg.trim().toUpperCase(),note:d.note||'',fuel:st.fuel,gear:st.gear,ask:d.ask===''?null:+d.ask,sale:d.sale===''?null:+d.sale,other:d.oth===''?150:+d.oth,days:d.days===''?21:+d.days,target:d.tgt===''?500:+d.tgt,hammer:d.hammer===''?null:+d.hammer,vat_indem:!!d.vatIndem,repairs:d.repairs,checklist:st.chk};
+  const patch={status:'shortlist',model:d.model.trim(),reg:d.reg.trim().toUpperCase(),note:d.note||'',fuel:st.fuel,gear:st.gear,ask:d.ask===''?null:+d.ask,sale:d.sale===''?null:+d.sale,other:d.oth===''?0:+d.oth,target:d.tgt===''?500:+d.tgt,hammer:d.hammer===''?null:+d.hammer,vat_indem:!!d.vatIndem,repairs:d.repairs,checklist:st.chk};
   try{
     if(st.active){const{error}=await sb.from('flip_cars').update(patch).eq('id',st.active);if(error)throw error}
     else{const{data,error}=await sb.from('flip_cars').insert(patch).select().single();if(error)throw error;st.active=data.id;st.short.push({id:data.id,source:'manual',draft:st.draft,chk:st.chk,fuel:st.fuel,gear:st.gear})}
@@ -246,7 +246,7 @@ const msg=(t,c)=>{const e=$('#cmsg');if(e){e.textContent=t;e.className=c}};
 $('#app').addEventListener('click',async e=>{const b=e.target.closest('[data-a]');if(!b)return;const v=b.dataset.v;
 switch(b.dataset.a){
 case'lookup':await doLookup();return;
-case'useAuc':{const h=+st.draft.hammer||0,idm=indemFor(h);if(!h||idm==null)return;const total=h+h*.2+idm+(st.draft.vatIndem?idm*.2:0);st.draft.ask=String(Math.round(total*100)/100);scheduleSave();tab='check';render();window.scrollTo(0,0);return}
+case'useAuc':{const h=+st.draft.hammer||0,idm=indemFor(h);if(!h||idm==null)return;const vatH=h*.2,vatI=st.draft.vatIndem?idm*.2:0,r2=x=>Math.round(x*100)/100;st.draft.ask=String(r2(h+vatH));st.draft.oth=String(r2(idm+vatI));scheduleSave();tab='check';render();window.scrollTo(0,0);return}
 case'addrep':{const n=$('#rn').value.trim(),a=parseFloat($('#ra').value);if(!n||!(a>=0)){$('#rerr').textContent='Enter a repair name and amount first.';return}st.draft.repairs.push({n,a});$('#rn').value='';$('#ra').value='';$('#rerr').textContent='';scheduleSave();updCheck();return}
 case'delrep':st.draft.repairs.splice(+b.dataset.i,1);scheduleSave();updCheck();return;
 case'buy':{const d=st.draft,c=calc(d);if(!d.model.trim()||!c.ask){$('#berr').textContent='Add the model and asking price first.';return}
