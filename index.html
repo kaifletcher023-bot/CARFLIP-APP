@@ -126,6 +126,28 @@ const costOf=c=>c.bought+c.rep+c.other+daysHeld(c)*4;
 const curPrice=c=>c.soldPrice!=null?c.soldPrice:c.offers.length?c.offers[c.offers.length-1][1]:c.listed;
 const sCar=()=>st.cars.find(c=>c.id===selId&&c.soldPrice==null)||st.cars.find(c=>c.soldPrice==null);
 const nf=(k,l)=>`<label>${l}<input data-d="${k}" type="number" inputmode="decimal" value="${esc(st.draft[k])}"></label>`;
+const ADVISORY_RULES=[
+  [/\bhas (?:a |an )?(?:minor |major )?leaks? of [\w\s]+/i,'leak'],
+  [/\bhas (?:a |an )?(?:minor |major )?leaks?\b.*/i,'leak'],
+  [/\b(?:slightly )?damaged\/cracking or perishing.*/i,'damaged/cracking'],
+  [/\bworn close to (?:the )?legal limit.*/i,'worn'],
+  [/\bworn on edge.*/i,'worn'],
+  [/\bbelow requirements\b.*/i,'low'],
+  [/\bfractured or broken.*/i,'broken'],
+  [/\binoperative.*/i,''],
+  [/\bnot working.*/i,''],
+  [/\bdefective\b.*/i,''],
+  [/\bfluctuating.*/i,'fluctuating'],
+  [/\bexcessively damaged or deteriorated.*/i,'damaged'],
+  [/\bcorroded\b.*/i,'corroded'],
+  [/\binsecure\b.*/i,'loose'],
+  [/\bmissing\b.*/i,'missing'],
+];
+function shortAdvisory(raw){
+  let t=String(raw).split(/\(\d+\.\d+/)[0].trim();
+  for(const[re,repl] of ADVISORY_RULES){if(re.test(t)){t=t.replace(re,repl);break}}
+  return t.replace(/[\s,]+$/,'').trim();
+}
 function slCard(){if(!st.short.length)return '';return `<div class="card"><h2>Shortlist <small>${st.short.length} car${st.short.length>1?'s':''}</small></h2>${st.short.map(x=>{const c=calc(x.draft),v=!c.ask||!c.sale?'Needs prices':c.ask<=c.max?'Worth viewing':'Over by '+f(c.ask-c.max),k=!c.ask||!c.sale?'':c.ask<=c.max?'t-ok':'t-bad';return `<button class="lb${x.id===st.active?' sel2':''}" data-a="opensl" data-id="${x.id}"><b>${esc(x.draft.model||'Unnamed')}</b> <small>${esc(x.draft.reg||'')}</small>${x.source==='alert'?' <small class="t-ok">from alert</small>':''}<br><small>${c.ask?'Asking '+f(c.ask)+' · ':''}${c.sale?'Max bid '+f(c.max)+' · ':''}<span class="${k}">${v}</span></small></button>`}).join('')}</div>`}
 function vAuction(){const d=st.draft;return `<div class="card"><h2>Auction out-the-door price</h2>
 <label>Hammer price (£)<input data-d="hammer" type="number" inputmode="decimal" value="${esc(d.hammer)}" placeholder="3500"></label>
@@ -154,7 +176,7 @@ e.innerHTML=mets([['Indemnity charge',f(idm)],['VAT on hammer (20%)',f(vatH)],['
 function updCheck(){if(!$('#res'))return;const d=st.draft,c=calc(d);
 $('#reptot').textContent=f(c.rep);
 $('#otd').innerHTML=(c.ask||c.fees)?mets([['Out the door',f(c.otd)]]):'';
-$('#replist').innerHTML=d.repairs.length?d.repairs.map((r,i)=>`<div class="li"><span>${esc(r.n)}</span><span class="r" style="gap:6px">£<input type="number" inputmode="decimal" data-rep="${i}" value="${r.a}" style="width:74px;margin:0;padding:7px 8px" aria-label="${esc(r.n)} cost"><button class="sm" data-a="delrep" data-i="${i}" aria-label="Remove ${esc(r.n)}">×</button></span></div>`).join(''):'<small>No repairs yet. Add each job with its cost.</small>';
+$('#replist').innerHTML=d.repairs.length?d.repairs.map((r,i)=>`<div class="li"><input type="text" data-repn="${i}" value="${esc(r.n)}" style="flex:1;margin:0;padding:7px 8px;border:0;background:none" aria-label="Repair name"><span class="r" style="gap:6px">£<input type="number" inputmode="decimal" data-rep="${i}" value="${r.a}" style="width:74px;margin:0;padding:7px 8px" aria-label="${esc(r.n)} cost"><button class="sm" data-a="delrep" data-i="${i}" aria-label="Remove ${esc(r.n)}">×</button></span></div>`).join(''):'<small>No repairs yet. Add each job with its cost.</small>';
 $('#res').innerHTML=(!c.ask||!c.sale)?ban('wn','Enter the asking price and expected sale price to see the verdict.'):(c.ask<=c.max?ban('ok',`Asking price is ${f(c.max-c.ask)} under your max bid. Worth viewing.`):ban('bad',`Asking price is ${f(c.ask-c.max)} over your max bid. Offer ${f(c.max)} or walk away.`))+mets([['Profit',f(c.profit),c.profit>=0?'t-ok':'t-bad'],['ROI',c.roi.toFixed(1)+'%'],['Auction fees',f(c.fees)],['Max bid',f(c.max)]])+'<small>Assumes a 5% haggle off the sale price and a 10% repair buffer.</small>'}
 function vView(){const d=st.draft,ns=st.notes[d.model||'_']||'';
 let h=`<div class="card"><h2>${esc(d.model||'No model set')} <small>${esc(d.reg)}</small></h2>
@@ -249,7 +271,16 @@ async function doLookup(){
       const adv=(out.dvsa.tests||[]).flatMap(t=>t.advisories||[]);
       if(!st.draft.mileage&&out.dvsa.tests&&out.dvsa.tests.length&&out.dvsa.tests[0].mileage!=null)st.draft.mileage=String(out.dvsa.tests[0].mileage);
       if(out.dvsa.mileageDrop){const c=ck('s1-0');c.s='issue';c.n='Mileage history shows a drop between tests — check carefully.'}
-      bits.push(adv.length?`MOT: ${adv.length} advisory line${adv.length>1?'s':''} on record.`:'MOT: no advisories on recent tests.');
+      let addedCount=0;
+      const latestAdv=(out.dvsa.tests&&out.dvsa.tests[0]&&out.dvsa.tests[0].advisories)||[];
+      if(latestAdv.length){
+        const existing=new Set(st.draft.repairs.map(r=>r.n));
+        latestAdv.forEach(a=>{
+          const short=shortAdvisory(a);
+          if(short&&!existing.has(short)){st.draft.repairs.push({n:short,a:0});existing.add(short);addedCount++}
+        });
+      }
+      bits.push(addedCount?`MOT: ${addedCount} advisor${addedCount>1?'ies':'y'} added to repairs — set a price for each.`:adv.length?`MOT: ${adv.length} advisory line${adv.length>1?'s':''} on record.`:'MOT: no advisories on recent tests.');
     } else if(out.dvsa&&out.dvsa.found===false)bits.push('MOT: no history found for that plate.');
     lookupMsg=bits.length?bits.join(' · '):'No extra details came back for that plate.';
     scheduleSave();
@@ -301,6 +332,7 @@ if(d.d!==undefined){st.draft[d.d]=t.type==='checkbox'?t.checked:t.value;if(tab==
 else if(d.c!==undefined){ck(d.c).c=t.value;updChk();scheduleSave()}
 else if(d.n!==undefined){ck(d.n).n=t.value;scheduleSave()}
 else if(d.rep!==undefined){st.draft.repairs[+d.rep].a=+t.value||0;updCheck();scheduleSave()}
+else if(d.repn!==undefined){st.draft.repairs[+d.repn].n=t.value;scheduleSave()}
 else if(d.cf!==undefined){const c=sCar();c[d.cf]=+t.value||0;updCar();scheduleStockSave(c)}
 else if(d.note!==undefined){st.notes[st.draft.model||'_']=t.value;scheduleNote(st.draft.model||'_',t.value)}});
 
