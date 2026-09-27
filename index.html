@@ -80,8 +80,8 @@ small{color:var(--t2);font-size:12.5px}
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // ---------- CONFIG: fill these in from your Supabase project ----------
-const SUPABASE_URL = "https://surgppobaxxhvcqkfozf.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_L-MMYLMJYYKybw4Xx6SVUQ_1Avippfs";
+const SUPABASE_URL = "YOUR_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
 // The Edge Function URL is derived from SUPABASE_URL automatically.
 // -----------------------------------------------------------------------
 
@@ -141,7 +141,7 @@ function vCheck(){const d=st.draft;return slCard()+`<div class="card"><h2>Deal c
 <label style="margin-bottom:10px">Mileage<input data-d="mileage" type="number" inputmode="numeric" value="${esc(d.mileage)}" placeholder="62000"></label>
 <label style="margin-bottom:10px">Listing link, seller, notes<textarea data-d="note" rows="2" placeholder="Link, seller's number, what they said">${esc(d.note||'')}</textarea></label>
 <div class="g2">${nf('ask','Asking or agreed price (£)')}${nf('sale','Expected sale (£)')}${nf('oth','Auction fees (£)')}${nf('tgt','Target profit (£)')}</div><small>Auction fees fill in automatically when you use the Auction tab, or type your own.</small><div id="otd" style="margin-top:10px"></div></div>
-<div class="card"><h2>Repairs <span id="reptot"></span></h2><div id="replist"></div><div class="r" style="margin-top:8px"><input id="rn" placeholder="Clutch"><input id="ra" type="number" inputmode="numeric" placeholder="£" style="width:90px"><button class="sm" data-a="addrep" aria-label="Add repair">+</button></div><small id="rerr" class="t-bad"></small></div>
+<div class="card"><h2>Repairs <span id="reptot"></span></h2><div id="replist"></div><div class="r" style="margin-top:8px"><input id="rn" placeholder="Clutch"><input id="ra" type="number" inputmode="numeric" placeholder="£" style="width:90px"><button class="sm" data-a="addrep" aria-label="Add repair">+</button></div><div class="r" style="margin-top:8px"><button class="sm" data-a="adddelivery">+ Delivery (£80)</button></div><small id="rerr" class="t-bad"></small></div>
 <div id="res"></div>
 <button class="pri" data-a="buy" style="margin-top:8px">Bought it: add to In stock</button><small id="berr" class="t-bad"></small>
 <div class="r" style="margin-top:12px"><button class="sm" data-a="newdeal">New deal</button>${st.active?`<button class="sm" data-a="rmsl">${slArm===st.active?'Tap again to remove':'Remove from shortlist'}</button>`:''}</div>`}
@@ -241,7 +241,7 @@ async function doLookup(){
     const bits=[];
     if(out.dvla&&out.dvla.configured===false)bits.push('DVLA lookup not set up yet.');
     else if(out.dvla&&out.dvla.found){
-      if(!st.draft.model.trim()&&out.dvla.make)st.draft.model=out.dvla.make;
+      if(!st.draft.model.trim()){const cc=out.dvla&&out.dvla.engineCC,litres=cc?(Math.round(cc/100)/10).toFixed(1):'',parts=[out.dvla&&out.dvla.make,out.dvsa&&out.dvsa.model,litres].filter(Boolean);if(parts.length)st.draft.model=parts.join(' ')}
       bits.push(`DVLA: ${[out.dvla.make,out.dvla.colour].filter(Boolean).join(' ')}, MOT ${out.dvla.motStatus||'unknown'}`);
     } else if(out.dvla&&out.dvla.found===false)bits.push('DVLA: no record for that plate.');
     if(out.dvsa&&out.dvsa.configured===false)bits.push('MOT history lookup not set up yet.');
@@ -266,6 +266,7 @@ case'lookup':await doLookup();return;
 case'useAuc':{const h=+st.draft.hammer||0,idm=indemFor(h);if(!h||idm==null)return;const vatH=h*.2,vatI=st.draft.vatIndem?idm*.2:0,r2=x=>Math.round(x*100)/100;st.draft.ask=String(r2(h+vatH));st.draft.oth=String(r2(idm+vatI));scheduleSave();tab='check';render();window.scrollTo(0,0);return}
 case'addrep':{const n=$('#rn').value.trim(),a=parseFloat($('#ra').value);if(!n||!(a>=0)){$('#rerr').textContent='Enter a repair name and amount first.';return}st.draft.repairs.push({n,a});$('#rn').value='';$('#ra').value='';$('#rerr').textContent='';scheduleSave();updCheck();return}
 case'delrep':st.draft.repairs.splice(+b.dataset.i,1);scheduleSave();updCheck();return;
+case'adddelivery':st.draft.repairs.push({n:'Delivery',a:80});scheduleSave();updCheck();return;
 case'buy':{const d=st.draft,c=calc(d);if(!d.model.trim()||!c.ask){$('#berr').textContent='Add the model and asking price first.';return}
 await flushNow();
 const patch={status:'stock',model:d.model.trim(),reg:d.reg.trim().toUpperCase(),mileage:d.mileage===''?null:+d.mileage,bought:c.ask,rep_est:c.rep,rep:c.rep,other:+d.oth||0,listed:c.sale,target:+d.tgt||0,start:new Date().toISOString(),offers:[],sold_price:null,sold_ts:null,pay:[false,false,false,false]};
