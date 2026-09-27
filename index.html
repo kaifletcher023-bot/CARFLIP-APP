@@ -80,8 +80,8 @@ small{color:var(--t2);font-size:12.5px}
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // ---------- CONFIG: fill these in from your Supabase project ----------
-const SUPABASE_URL = "https://surgppobaxxhvcqkfozf.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_L-MMYLMJYYKybw4Xx6SVUQ_1Avippfs";
+const SUPABASE_URL = "YOUR_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
 // The Edge Function URL is derived from SUPABASE_URL automatically.
 // -----------------------------------------------------------------------
 
@@ -280,7 +280,7 @@ async function doLookup(){
           if(short&&!existing.has(short)){st.draft.repairs.push({n:short,a:0});existing.add(short);addedCount++}
         });
       }
-      bits.push(addedCount?`MOT: ${addedCount} advisor${addedCount>1?'ies':'y'} added to repairs — set a price for each.`:adv.length?`MOT: ${adv.length} advisory line${adv.length>1?'s':''} on record.`:'MOT: no advisories on recent tests.');
+      bits.push(addedCount?`MOT: ${addedCount} issue${addedCount>1?'s':''} added to repairs — set a price for each.`:adv.length?`MOT: ${adv.length} issue${adv.length>1?'s':''} on record.`:'MOT: no issues on recent tests.');
     } else if(out.dvsa&&out.dvsa.found===false)bits.push('MOT: no history found for that plate.');
     lookupMsg=bits.length?bits.join(' · '):'No extra details came back for that plate.';
     scheduleSave();
